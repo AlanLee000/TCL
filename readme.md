@@ -109,9 +109,9 @@ TCL 是一个**次协调** (Paraconsistent) 系统。它通过**矛盾隔离**�
 本项目提供了一个基于理论的 Lean 4 实现。
 
 ### 文件结构
-
--   `TCL.lean`: 定义了 TCL 的核心数据结构 (`Statement`, `Predicate`) 和确定性的归约引擎 (`reduceStep`, `reduce`, `eval`)。
--   `TCL/Proof.lean`: 包含了对系统**合流性**的形式化证明。
+-   `TriCtxLang.lean`
+-     `TCL`: 定义了 TCL 的核心数据结构 (`Statement`, `Predicate`) 和确定性的归约引擎 (`reduceStep`, `reduce`, `eval`)。
+-     `TCL.Proof`: 包含了对系统**合流性**的形式化证明。
 
 
 ## 如何构建与验证
