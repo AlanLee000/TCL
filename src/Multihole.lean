@@ -180,4 +180,4 @@ end Session
 end TCL.MultiHole
 
 -- 要运行此交互式会话，请取消下面这行代码的注释
--- #eval TCL.MultiHole.Session.main
+#eval TCL.MultiHole.Session.main

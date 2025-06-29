@@ -148,3 +148,9 @@
 变量的意外捕获我们通过如下方法处理：我们一旦取定一个值，立刻通过be赋予它一个系统中从未出现的名字：`(a,be,a')`并立即执行一个归约`(a,→,a')`。这种机制保证了每一个计算取定的值都是新鲜的。
 
 **我们就此证明了，CNRS 可以通过一条公理和一个全局重写规则，完美地模拟 λ 演算的 β-归约。**
+---
+<p xmlns:cc="http://creativecommons.org/ns#" xmlns:dct="http://purl.org/dc/terms/">
+  <a property="dct:title" rel="cc:attributionURL" href="[你的GitHub仓库或项目链接]">你的项目/文章标题</a> 
+  由 <span property="cc:attributionName">AlanLee000</span> 在 © 2025 创作，
+  并采用 <a rel="license" href="http://creativecommons.org/licenses/by/4.0/" style="display:inline-block;">CC BY 4.0<img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/cc.svg?ref=chooser-v1"><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/by.svg?ref=chooser-v1"></a> 进行许可。
+</p>
