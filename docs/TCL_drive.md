@@ -219,7 +219,7 @@ TCL是一个雄心勃勃的尝试，它将我们对世界的结构化组织、�
 通过揭示同一性的分裂、构造性的真理、元-对象循环以及元即感知的深刻洞见，TCL为我们思考语言、逻辑、计算乃至智能本身的未来，提供了一片充满可能性的新大陆。它既是回溯根本的哲学反思，也是展望未来的理论奠基。
 
 <p xmlns:cc="http://creativecommons.org/ns#" xmlns:dct="http://purl.org/dc/terms/">
-  <a property="dct:title" rel="cc:attributionURL" href="[你的GitHub仓库或项目链接]">你的项目/文章标题</a> 
+  <a property="dct:title" rel="cc:attributionURL" href="https://github.com/AlanLee000/TCL">TCL</a> 
   由 <span property="cc:attributionName">AlanLee000</span> 在 © 2025 创作，
   并采用 <a rel="license" href="http://creativecommons.org/licenses/by/4.0/" style="display:inline-block;">CC BY 4.0<img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/cc.svg?ref=chooser-v1"><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/by.svg?ref=chooser-v1"></a> 进行许可。
 </p>

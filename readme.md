@@ -4,8 +4,8 @@
 [![License: CC BY 4.0](https://img.shields.io/badge/Docs%20License-CC%20BY%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/)
 
 一个旨在统一**知识表示**、**逻辑推理**和**通用计算**的形式化语言。本项目包含其完整的理论论述和在 Lean 4 中经过形式化验证的参考实现。
-完整理论论述见[TriCtxLang](./docs/TriCtxLang.md)
-一个更可读的哲学动机分析见[TCL_drive](./docs/TCL_drive.md)
+完整理论论述见[TriCtxLang](./docs/TriCtxLang.md)。
+一个更可读的哲学动机分析见[TCL_drive](./docs/TCL_drive.md)。
 
 ---
 
