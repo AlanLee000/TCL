@@ -117,6 +117,7 @@ TCL 是一个**次协调** (Paraconsistent) 系统。它通过**矛盾隔离**�
 ### 文件结构
 -   `TriCtxLang.lean`: 定义了 TCL 的核心数据结构 (`Statement`, `Predicate`) 和确定性的归约引擎 (`reduceStep`, `reduce`, `eval`)。 包含了对系统**合流性**的形式化证明。
 -   `TCL1.lean`: 定义了TCL的包含元层的实现，并重新实现了TCL的核心数据结构，包含了对系统合流性的形式化证明、假的实现与次协调一致性的证明
+-   `Multihole.lean`：定义了多洞感知机制。
 
 ## 如何构建与验证
 
