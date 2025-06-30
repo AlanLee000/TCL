@@ -9,7 +9,6 @@ open Lean.Elab.Command -- 允许直接使用 CommandElabM
 open TCL.Interactive
 
 -- `declare_syntax_cat`, `syntax` 规则和 `elabStatement` 保持完全不变
--- ... (这部分代码无需修改) ...
 declare_syntax_cat tcl_statement
 syntax ident : tcl_statement
 syntax "(" tcl_statement "->" tcl_statement ")" : tcl_statement
