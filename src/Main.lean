@@ -1,6 +1,61 @@
 import MyMathProject.TCL.src.Multihole
 import MyMathProject.TCL.src.TCL1
+import Lean.Parser -- 引入 Lean 的解析器库
+import Lean.Elab.Command -- 1. 引入 Command Elab Monad
 
+namespace CombinedSystem.Parser
+open Lean Parser
+open Lean.Elab.Command -- 允许直接使用 CommandElabM
+open TCL.Interactive
+
+-- `declare_syntax_cat`, `syntax` 规则和 `elabStatement` 保持完全不变
+-- ... (这部分代码无需修改) ...
+declare_syntax_cat tcl_statement
+syntax ident : tcl_statement
+syntax "(" tcl_statement "->" tcl_statement ")" : tcl_statement
+syntax "[" tcl_statement "," tcl_statement "]" : tcl_statement
+syntax tcl_statement:66 " • " tcl_statement:65 : tcl_statement
+syntax "(" tcl_statement ")" : tcl_statement
+
+partial def elabStatement : Syntax → Except String Statement
+  | `(tcl_statement| $n:ident) =>
+    return .noun n.getId.toString
+  | `(tcl_statement| ( $s:tcl_statement -> $o:tcl_statement )) => do
+    let s' ← elabStatement s
+    let o' ← elabStatement o
+    return .formula s' .Rewrite o'
+  | `(tcl_statement| [ $n:tcl_statement , $b:tcl_statement ]) => do
+    let n' ← elabStatement n
+    let b' ← elabStatement b
+    return .naming n' b'
+  | `(tcl_statement| $s1:tcl_statement • $s2:tcl_statement) => do
+    let s1' ← elabStatement s1
+    let s2' ← elabStatement s2
+    return .seq s1' s2'
+  | `(tcl_statement| ( $s:tcl_statement )) => elabStatement s
+  | _ => Except.error "未知或无效的语句语法"
+
+
+-- 4. 创建一个顶层函数来运行整个解析流程。
+--    *** 这是发生变化的地方 ***
+def parseStatement (input : String) : CommandElabM (Option Statement) := do
+  -- 2. 现在 getEnv 可以工作了，因为它在 CommandElabM 中
+  let env ← getEnv
+  -- runParserCategory 是纯函数，它不关心在哪个监视中被调用
+  match Parser.runParserCategory env `tcl_statement input with
+  | Except.error e =>
+    -- 3. IO 操作被自动提升到 CommandElabM 中
+    IO.println s!"[Parser Error] {e}"
+    return none
+  | Except.ok stx =>
+    match elabStatement stx with
+    | Except.error e =>
+      IO.println s!"[Elaboration Error] {e}"
+      return none
+    | Except.ok stmt =>
+      return some stmt
+
+end CombinedSystem.Parser
 /-!
 # 多洞感知计算系统 (Combined System) - 修正版
 
@@ -20,23 +75,21 @@ import MyMathProject.TCL.src.TCL1
 -/
 namespace CombinedSystem
 
--- 修正 #1: 使用 `open` 来更清晰地管理命名空间
--- 这将 TCL.MultiHole.Session 中的所有公共定义引入当前作用域
-open TCL.MultiHole.Session
-open TCL.Interactive.Session (instToStringStatement) -- 只引入 ToString 实例
+-- ## 1. 命名空间管理 (核心修正)
+-- 只从 MultiHole.Session 导入我们需要的函数，避免名称冲突
+open TCL.MultiHole.Session (prettyPrint getHoleIds)
+-- 同样，只从 Interactive.Session 导入 ToString 实例
+open TCL.Interactive.Session (instToStringStatement)
+-- 导入我们新的解析器模块和 CommandElabM
+open CombinedSystem.Parser
+open Lean.Elab.Command
 
--- ## 1. 类型桥接 (Type Bridge)
--- 这是连接两个系统的关键粘合剂。虽然两个文件中的 `Statement`
--- 结构相同，但它们在Lean的类型系统中是不同的类型，因为它们位于
--- 不同的命名空间。我们需要一个显式的转换函数。
-
--- 将系统A的 Predicate 转换为系统B的 Predicate
+-- ## 2. 类型桥接 (无变化)
 def convertPredicate (p : TCL.MultiHole.Predicate) : TCL.Interactive.Predicate :=
   match p with
   | .Be => .Be
   | .Rewrite => .Rewrite
 
--- 将系统A的 Statement 递归转换为系统B的 Statement
 partial def convertStatement (s_A : TCL.MultiHole.Statement) : TCL.Interactive.Statement :=
   match s_A with
   | .noun n => .noun n
@@ -45,86 +98,52 @@ partial def convertStatement (s_A : TCL.MultiHole.Statement) : TCL.Interactive.S
   | .naming name body => .naming (convertStatement name) (convertStatement body)
   | .seq s1 s2 => .seq (convertStatement s1) (convertStatement s2)
 
--- ## 2. 统一的交互模块
--- 我们需要一个新的交互逻辑，它可以解析系统B支持的更多语句格式。
-
-/--
-一个统一的解析器，可以处理多种用户输入格式：
-- `'simple_noun'`
-- `'[name, body]'` (来自系统A)
-- `'(subject -> object)'` (来自系统B)
--/
-def combinedParser (input : String) : IO TCL.Interactive.Statement := do
-  let trimmed := input.trim
-  if trimmed.startsWith "(" && trimmed.endsWith ")" then
-    let inner := trimmed.drop 1 |>.dropRight 1
-    match inner.splitOn "->" with
-    | [s, o] => return .formula (.noun s.trim) .Rewrite (.noun o.trim)
-    | _ =>
-      IO.println s!"[Parser Warning] Invalid formula format. Treating as simple noun."
-      return .noun trimmed
-  else if trimmed.startsWith "[" && trimmed.endsWith "]" then
-    let inner := trimmed.drop 1 |>.dropRight 1
-    match inner.splitOn "," with
-    | [n, b] => return .naming (.noun n.trim) (.noun b.trim)
-    | _ =>
-      IO.println s!"[Parser Warning] Invalid naming format. Treating as simple noun."
-      return .noun trimmed
-  else
-    return .noun trimmed
-
-/--
-为多洞感知定制的答案收集循环，使用我们新的 `combinedParser`。
-它返回一个 `Answers` 哈希图，但其中的 Statement 是系统B的类型。
--/
-partial def askForAnswersCombined (ids : List TCL.MultiHole.HoleId) (answers : Std.HashMap TCL.MultiHole.HoleId TCL.Interactive.Statement) : IO (Std.HashMap TCL.MultiHole.HoleId TCL.Interactive.Statement) := do
+-- ## 3. 交互模块 (无变化)
+-- (askForAnswersCombined 函数现在可以正确地解析名称，因为歧义已消除)
+partial def askForAnswersCombined (ids : List TCL.MultiHole.HoleId) (answers : Std.HashMap TCL.MultiHole.HoleId TCL.Interactive.Statement) : CommandElabM (Std.HashMap TCL.MultiHole.HoleId TCL.Interactive.Statement) := do
   match ids with
   | [] => return answers
   | id :: rest =>
     IO.println s!"\nPlease provide a statement for <HOLE {id}>"
-    IO.println "Supported formats: 'noun', '[name, body]', or '(subject -> object)'"
+    IO.println "Supported formats: 'noun', '[name, body]', '(subject -> object)', 's1 • s2'"
     IO.print "> "
     let stdin ← IO.getStdin
     let userInput ← stdin.getLine
-    let statement ← combinedParser userInput.trim
-    askForAnswersCombined rest (answers.insert id statement)
+    -- 歧义已解决，这里将明确调用 CombinedSystem.Parser.parseStatement
+    match ← parseStatement userInput.trim with
+    | none =>
+      IO.println "Invalid input. Please try again."
+      askForAnswersCombined (id :: rest) answers
+    | some statement =>
+      askForAnswersCombined rest (answers.insert id statement)
 
-
--- ## 3. 主执行函数 `main`
-
-def main : IO Unit := do
+-- ## 4. 主执行函数 `main` (修正了 HashMap 的创建)
+def main : CommandElabM Unit := do
   IO.println "================================================="
   IO.println "   Combined Multi-Hole Perception & Computation"
   IO.println "================================================="
 
-  -- 步骤 1: 定义一个复杂的多洞模板。
-  -- 这个模板的结构是 `(<HOLE 0> • (<HOLE 0> → <HOLE 1>))`
-  -- 这是一个典型的 "前提 • (前提 → 结论)" 结构，等待被填充。
   let template : TCL.MultiHole.MultiContext :=
     .seq
       (.hole 0)
       (.formula (.hole 0) TCL.MultiHole.Predicate.Rewrite (.hole 1))
 
   IO.println s!"[Frontend] A multi-hole template has been defined:"
-  -- `prettyPrint` 来自 `open TCL.MultiHole.Session`
+  -- `prettyPrint` 和 `getHoleIds` 现在可以安全使用
   IO.println s!"  Template: {prettyPrint template}"
 
-  -- 步骤 2: 使用系统A的机制感知洞。
-  -- `getHoleIds` 也来自 `TCL.MultiHole.Session`
-  let holeIds := (TCL.MultiHole.Session.getHoleIds template).eraseDup.insertionSort (· ≤ ·)
+  let holeIds := (getHoleIds template).eraseDup.insertionSort (· ≤ ·)
   IO.println s!"[Frontend] System perceives {holeIds.length} unique holes: {holeIds}"
   IO.println "-------------------------------------------------"
 
-  -- 步骤 3: 使用统一的交互界面收集所有答案。
   IO.println "[Frontend] Starting to collect answers for all holes..."
-  -- 修正 #2: 使用 Std.HashMap.empty 或指定容量
-  let finalAnswersB ← askForAnswersCombined holeIds (Std.HashMap.emptyWithCapacity)
+  -- 使用 `{}` 来创建空的 HashMap，修复了弃用警告
+  let finalAnswersB ← askForAnswersCombined holeIds {}
 
-  -- 更优的方案：重写 `fill` 函数以直接处理系统B的答案
   let rec fillCombined (mc : TCL.MultiHole.MultiContext) (answers : Std.HashMap TCL.MultiHole.HoleId TCL.Interactive.Statement) : Option TCL.Interactive.Statement :=
     match mc with
     | .hole id => answers[id]?
-    | .const s => some (convertStatement s) -- 常量需要转换
+    | .const s => some (convertStatement s)
     | .formula s p o => do
       let s' ← fillCombined s answers
       let o' ← fillCombined o answers
@@ -138,35 +157,28 @@ def main : IO Unit := do
       let s2' ← fillCombined c2 answers
       return .seq s1' s2'
 
-
   IO.println "\n-------------------------------------------------"
   IO.println "[Bridge] All answers collected. Attempting to fill the template..."
 
-  -- 步骤 4: 填充模板，直接生成一个系统B的 `Statement`。
   match fillCombined template finalAnswersB with
   | none =>
     IO.println "❌ Error: Failed to fill the template. A required answer was missing."
   | some assembledStatement =>
     IO.println "✅ Success! Template filled."
-    -- 修正 #3: 使用 `have` 显式引入实例，确保编译器能找到它
     have : ToString TCL.Interactive.Statement := instToStringStatement
     IO.println s!"[Object Level] Assembled statement: {assembledStatement}"
 
-    -- 步骤 5: 将组装好的语句送入系统B的计算引擎。
     IO.println "\n[Backend] Wrapping statement in Gamma context and sending to evaluation engine..."
-    -- 使用全名确保无歧义
     let worldToEvaluate : TCL.Interactive.Statement := .naming (.noun TCL.Interactive.Noun.gamma) assembledStatement
     IO.println s!"  Engine Input: {worldToEvaluate}"
 
-    -- 执行计算
     let finalWorld := TCL.Interactive.eval worldToEvaluate
 
-    -- 步骤 6: 展示最终结果。
     IO.println "\n[Backend] Evaluation complete."
     IO.println s!"  Engine Output (Final State): {finalWorld}"
     IO.println "================================================="
 
 end CombinedSystem
 
--- 要运行这个集成的交互式会话，请取消下面这行代码的注释。
+-- 现在可以正确工作了
 #eval CombinedSystem.main
